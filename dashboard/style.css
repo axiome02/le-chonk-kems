@@ -820,6 +820,15 @@ button:disabled {
   border-color: #FFA01A;
 }
 
+/* Source card highlight: briefly pulses before leaving its slot */
+.card.card-lift {
+  transform: scale(1.08) translateY(-6px);
+  box-shadow: 0 0 0 3px var(--mistral-orange), 0 8px 20px rgba(0,0,0,0.8) !important;
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  z-index: 5;
+  position: relative;
+}
+
 /* Sweep out transition for center cards */
 .card.sweeping-out, .card-slot.sweeping-out {
   transform: translate(65px, 35px) rotate(16deg) scale(0.85);

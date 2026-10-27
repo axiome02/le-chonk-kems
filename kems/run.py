@@ -12,7 +12,6 @@ from .dashboard import GameRunner, Publisher, start_server
 from .llm import _http
 from .llm.env import load_env
 from .llm.mistral import MistralClient
-from .llm.mock import MockClient
 from .orchestrator import play_game
 from .transcript import render
 
@@ -40,7 +39,6 @@ def usage_summary(agents: dict) -> dict:
 
 CLIENTS = {
     "mistral": MistralClient,
-    "mock": MockClient,
 }
 
 
@@ -203,8 +201,6 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8000, help="dashboard port")
     ap.add_argument("--serve", action="store_true",
                     help="starts only the dashboard: games are launched from the page")
-    ap.add_argument("--demo", action="store_true",
-                    help="runs a pre-recorded demo match (no LLM calls) to test visual dashboard rendering")
     ap.add_argument("--seed-cards", type=int, default=None, help="shuffle seed (default: derived from --seed)")
     ap.add_argument("--seed-order", type=int, default=None, help="play-order seed (default: derived)")
     ap.add_argument("--model", type=str, default="mistral-large-4",
@@ -231,20 +227,13 @@ def main() -> None:
     load_env()
 
     kinds = [k.strip() for k in args.agents.split(",")]
-    if args.demo and not (args.dashboard or args.serve):
-        args.serve = True
 
     publisher = None
     if args.dashboard or args.serve:
         publisher = Publisher()
         url = start_server(port=args.port, runner=GameRunner(publisher))
         print(f"Dashboard: {url}")
-        if args.demo:
-            from .demo import play_demo
-            delay = args.delay if args.delay > 0 else 1.2
-            threading.Thread(target=play_demo, args=(publisher, delay), daemon=True).start()
-            print(f"Demo mode: playing pre-recorded match (step delay: {delay}s, no LLM calls). Ctrl+C to stop.\n")
-        elif args.serve:
+        if args.serve:
             print("Server mode: launch a game from the page. Ctrl+C to stop.\n")
 
         try:
@@ -293,6 +282,15 @@ def chonk_main() -> None:
     print("=" * 65)
     print("🃏 Starting KEMS ARENA — Mistral Large 4 Game Harness 🃏")
     print("=" * 65)
+
+    # Clean previous match state so dashboard starts fresh from 0
+    for stale_file in ("dashboard/state.json", "dashboard/state.json.tmp", "dashboard/match.txt", "llm_debug.log"):
+        p = Path(stale_file)
+        if p.exists():
+            try:
+                p.unlink()
+            except OSError:
+                pass
 
     env_path = Path(".env")
     if not env_path.exists():

@@ -15,6 +15,10 @@ def normalize(text: str) -> str:
 
     Emojis are preserved as is (only variation selectors are removed).
     """
+    if isinstance(text, list):
+        text = " ".join(str(x) for x in text)
+    elif not isinstance(text, str):
+        text = str(text) if text is not None else ""
     s = unicodedata.normalize("NFKD", text or "")
     s = "".join(c for c in s if not unicodedata.combining(c) and c not in _INVISIBLES)
     s = s.lower()

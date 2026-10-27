@@ -109,20 +109,8 @@ Options:
   --max-turns INT    Maximum turns per round (default: 8)
   --live             Stream public dialogue and moves in terminal
   --serve            Launch local web dashboard server
-  --demo             Run pre-recorded demo match without API calls
   --port INT         Dashboard port (default: 8000)
-  --pause FLOAT      Pause between API calls (default: 0.5s)
-```
-
----
-
-## 🧪 Testing
-
-The test suite runs 100% locally and deterministically without requiring an API key:
-
-```bash
-pip install -r requirements-dev.txt
-pytest
+  --pause FLOAT      Pause between API calls (default: 1.5s)
 ```
 
 ---

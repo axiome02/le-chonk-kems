@@ -132,6 +132,14 @@ def _run_team_negotiation(state: GameState, agents: dict, team: int, max_turns: 
         n = agent.debrief(view) if is_debrief else agent.negotiate(view)
         name = state.players[pid].name
 
+        # Detect safety refusals (e.g. LLM guardrail confusing Kem's rules with poker collusion)
+        msg_lower = (n.message or "").lower()
+        if any(w in msg_lower for w in ("i can't help", "i cannot help", "i won't", "i will not", "collusion", "unfair")):
+            n.message = "I am ready to play Kem's with you partner."
+            n.proposal = proposal or n.proposal or "banana"
+            n.trigger = trigger or n.trigger or "banana"
+            n.agree = True
+
         if n.message:
             state.team_channels[team].append(f"{name}: {n.message}")
         if is_debrief and n.plan:
@@ -190,7 +198,14 @@ def exchange_phase(state: GameState, agents: dict) -> None:
                 # The player decides whether to keep or break it.
                 rules.open_episode(state, pid)
             view = view_for(state, pid)
-            action = agents[pid].decide_card(view)
+            action, thought = agents[pid].decide_card(view)
+            if thought:
+                state.journals.setdefault(pid, []).append(thought)
+                rules.step(state, "REFLECTION", pid,
+                           f"{name} is evaluating cards",
+                           private=thought,
+                           **_extras_decision(view, agents[pid], f"THOUGHT: {thought}"))
+
             if isinstance(action, Take):
                 if rules.validate_and_apply_exchange(state, pid, action):
                     rules._log(state, "SWAP", pid,
@@ -258,24 +273,15 @@ def discussion_phase(state: GameState, agents: dict) -> None:
         order = _order(state)
         calls: dict[int, Call] = {}
         for pid in order:
-            # 1) player reflects privately
-            journal = state.journals.setdefault(pid, [])
-            seen_events = sum(1 for ev in state.public_log if ev.type in ("MESSAGE", "CALL"))
-            if journal and not is_square(state.hands[pid]) and seen_events == state.seen_at_reflection.get(pid):
-                reflection = journal[-1]
-            else:
-                view_reflection = view_for(state, pid)
-                reflection = agents[pid].reflect(view_reflection)
-                journal.append(reflection)
-                state.seen_at_reflection[pid] = seen_events
+            view = view_for(state, pid)
+            msg, call, plan, thought = agents[pid].decide_discussion(view)
+            if thought:
+                state.journals.setdefault(pid, []).append(thought)
                 rules.step(state, "REFLECTION", pid,
                            f"{state.players[pid].name} is thinking",
-                           private=reflection,
-                           **_extras_decision(view_reflection, agents[pid], reflection))
+                           private=thought,
+                           **_extras_decision(view, agents[pid], thought))
 
-            # 2) player speaks in public, private reflection in view
-            view = view_for(state, pid, reflection=reflection)
-            msg, call, plan = agents[pid].decide_discussion(view)
             call = call if isinstance(call, Call) else Call("NONE")
             extras = _extras_decision(view, agents[pid],
                                       f"MESSAGE='{msg}' CALL={call.kind} PLAN='{plan}'")

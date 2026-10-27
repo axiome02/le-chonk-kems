@@ -7,6 +7,19 @@ import time
 import requests
 
 MAX_WAIT = 60.0  # seconds: beyond this, it's an exhausted quota, not a rate limit
+_last_request_time = 0.0
+_request_lock = threading.Lock()
+
+
+def _pace_request(min_interval: float = 1.2) -> None:
+    """Enforces minimum interval between API calls to strictly respect provider rate limits."""
+    global _last_request_time
+    with _request_lock:
+        now = time.time()
+        elapsed = now - _last_request_time
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed)
+        _last_request_time = time.time()
 
 
 class APITracker(threading.local):
@@ -39,8 +52,11 @@ def post_json(url: str, headers: dict, payload: dict, *, retries: int = 6,
         if api_tracker.publisher:
             api_tracker.publisher.write(api_tracker.state, running=True)
 
+    min_gap = max(pause, 1.2) if pause else 1.2
+
     for attempt in range(retries):
         try:
+            _pace_request(min_gap)
             r = requests.post(url, headers=headers, json=payload, timeout=timeout)
             if r.status_code == 429 or r.status_code >= 500:
                 detail = (r.text or "").strip()[:300]
@@ -48,13 +64,16 @@ def post_json(url: str, headers: dict, payload: dict, *, retries: int = 6,
                 if attempt == retries - 1:
                     break
                 # Retry-After takes precedence; otherwise exponential backoff + jitter
-                wait = float(r.headers.get("Retry-After", 2 ** attempt))
+                try:
+                    wait = float(r.headers.get("Retry-After", 2 ** attempt))
+                except (ValueError, TypeError):
+                    wait = float(2 ** attempt)
                 wait_time = min(wait, MAX_WAIT)
 
                 if api_tracker.state is not None and api_tracker.current_pid is not None:
                     api_tracker.state.api_status[str(api_tracker.current_pid)] = {
                         "status": "rate_limited",
-                        "message": f"Rate limit ({r.status_code}). Retry in {wait_time:.1f}s...",
+                        "message": f"Pacing requests (retry in {wait_time:.1f}s)...",
                         "last_update": time.time(),
                         "retry_after": wait_time
                     }

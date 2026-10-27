@@ -12,6 +12,7 @@ class LLMClient:
         self.completion_tokens = 0
         self.cached_tokens = 0
         self.total_tokens = 0
+        self.last_reasoning: str | None = None
 
     def chat(self, system: str, user: str, max_tokens: int | None = None,
              image_b64: str | None = None) -> str:

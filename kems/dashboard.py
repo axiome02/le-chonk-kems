@@ -119,12 +119,24 @@ class Publisher:
 
     MIN_INTERVAL = 0.5
 
-    def __init__(self, directory: str = DASHBOARD_DIR, tokens=None):
+    def __init__(self, directory: str = DASHBOARD_DIR, tokens=None, reset_on_start: bool = True):
         self.filepath = os.path.join(directory, STATE_FILE)
+        self.transcript_path = os.path.join(directory, TRANSCRIPT_FILE)
         self._tokens = tokens or (lambda: None)
         self._last_write = 0.0
         self.transcript = None
         os.makedirs(directory, exist_ok=True)
+        if reset_on_start:
+            self.clear()
+
+    def clear(self) -> None:
+        """Clears state.json and match.txt so the dashboard starts fresh from 0."""
+        for path in (self.filepath, self.filepath + ".tmp", self.transcript_path):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except OSError:
+                pass
 
     def reconnect(self, tokens) -> None:
         """Points to a new match's token summary callback."""
@@ -203,6 +215,13 @@ class GameRunner:
         if self.busy:
             raise RuntimeError("a match is already running")
         self.error = None
+        if self.publisher is not None:
+            self.publisher.clear()
+        try:
+            if os.path.exists("llm_debug.log"):
+                os.remove("llm_debug.log")
+        except OSError:
+            pass
         self.thread = threading.Thread(target=self._run, args=(settings,), daemon=True)
         self.thread.start()
 

@@ -222,6 +222,12 @@
     setTimeout(() => p.remove(), 400);
   }
 
+  function highlightCard(el, cls, durationMs) {
+    if (!el) return;
+    el.classList.add(cls);
+    setTimeout(() => el && el.classList.remove(cls), durationMs);
+  }
+
   function animateFlight(card, fromRect, toRect, clsExtra, badgeLabel, durationMs = 950, offsetY = 0) {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const tempDiv = document.createElement("div");
@@ -556,11 +562,22 @@
         const siege = $("seat-" + t[idx].pid);
         const center = $("center");
         if (siege && center) {
-          const sRect = siege.getBoundingClientRect();
-          const cRect = center.getBoundingClientRect();
-          animateFlight(takeCard, cRect, sRect, "flying-take", "TAKE", 950, 15);
+          // Try to find the exact card elements for precise animation origins/destinations
+          const centerCardEl = center.querySelector(`[data-c="${CSS.escape(takeCard)}"]`);
+          const handCardEl = discardCard ? siege.querySelector(`[data-c="${CSS.escape(discardCard)}"]`) : null;
+
+          const fromRect = centerCardEl ? centerCardEl.getBoundingClientRect() : center.getBoundingClientRect();
+          const toRect = siege.getBoundingClientRect();
+          const fromHandRect = handCardEl ? handCardEl.getBoundingClientRect() : siege.getBoundingClientRect();
+          const toCenterRect = centerCardEl ? centerCardEl.getBoundingClientRect() : center.getBoundingClientRect();
+
+          // Briefly highlight source cards so the eye knows what's moving
+          highlightCard(centerCardEl, "card-lift", 300);
+          if (handCardEl) highlightCard(handCardEl, "card-lift", 300);
+
+          animateFlight(takeCard, fromRect, toRect, "flying-take", "TAKE", 950, 15);
           if (discardCard) {
-            animateFlight(discardCard, sRect, cRect, "flying-discard", "DISCARD", 950, -15);
+            animateFlight(discardCard, fromHandRect, toCenterRect, "flying-discard", "DISCARD", 950, -15);
           }
         }
       } else if (isForwardStep && t[idx].type === "CALL") {
@@ -578,7 +595,7 @@
   }
 
   const MODELS = {
-    mistral: ["mistral-large-4", "mistral-large-latest", "mistral-small-latest", "ministral-8b-latest", "mock-bot (offline)"]
+    mistral: ["mistral-large-4", "mistral-large-latest", "mistral-small-latest", "ministral-8b-latest"]
   };
 
   let apiKeys = {};
@@ -662,14 +679,13 @@
         max_turns: turnsVal ? +turnsVal.value : 8,
         max_rounds: roundsVal ? +roundsVal.value : 3,
         points_to_win: $("f-points") ? +$("f-points").value : 2,
-        pause: $("f-pause") ? +$("f-pause").value : 0.5,
+        pause: $("f-pause") ? +$("f-pause").value : 1.5,
         eval_signals: $("f-eval") ? $("f-eval").checked : false,
         players: [0, 1, 2, 3].map(i => {
           const modelVal = getPlayerField("model", i);
-          const isMock = modelVal.startsWith("mock");
           return {
-            agent: isMock ? "mock" : "mistral",
-            model: isMock ? "mock-bot" : modelVal,
+            agent: "mistral",
+            model: modelVal,
             temperature: +getPlayerField("temperature", i)
           };
         }),
@@ -722,6 +738,9 @@
         }
 
         if (followLive) idx = Math.max(0, tl().length - 1);
+        render();
+      } else {
+        data = null;
         render();
       }
     } catch (e) {}

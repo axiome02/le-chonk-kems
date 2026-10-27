@@ -51,16 +51,17 @@ def render(state: GameState, usage: dict | None = None, debug: bool = False) -> 
             player = state.players[e["pid"]]
             square = " [SQUARE!]" if e.get("square") else ""
             L.append(f"\n  > {player.name} (Team {player.team}){square}")
-            hand_cards = e.get("hand", [])
+            hand_cards = e.get("hand", []) or []
             L.append(f"      Hand:   {' '.join(hand_cards)}")
-            L.append(f"      Center: {' '.join(e['center'])}")
-            L.append(f"      Action: {e['action']}")
+            center_cards = e.get("center", []) or []
+            L.append(f"      Center: {' '.join(center_cards)}")
+            L.append(f"      Action: {e.get('action', '')}")
             if e.get("prompt_user") is not None:
                 L.append("      Prompt sent:")
-                L.append(_indent(e["prompt_user"]))
-                raw_resp = e.get("raw_response", "")
+                L.append(_indent(e.get("prompt_user") or ""))
+                raw_resp = e.get("raw_response", "") or ""
                 L.append("      Raw LLM response:")
-                L.append(_indent(raw_resp or ""))
+                L.append(_indent(raw_resp))
 
     # Standard clean story log
     L.append("=" * 64)
