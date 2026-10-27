@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CHONK KEMS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Navigation & Status Bar -->
+  <header class="bar">
+    <div class="brand">
+      <span class="dot" id="dot" title="Game status"></span>
+      <span id="loading-spinner" class="spinner" style="display:none;"></span>
+
+      <div class="brand-text">
+        <h1>CHONK</h1>
+        <div class="brand-badge">
+          <span>KEMS</span>
+        </div>
+      </div>
+      
+      <span id="live-api-summary" class="api-summary" style="display:none;"></span>
+    </div>
+    
+    <div class="stats-group">
+      <div class="stat"><span class="eyebrow">ROUND</span><b id="s-round">—</b></div>
+      <div class="stat"><span class="eyebrow">TURN</span><b id="s-turn">—</b></div>
+      <div class="stat"><span class="eyebrow">SCORE</span><b id="s-score">—</b></div>
+      <div class="stat"><span class="eyebrow">TOKEN INPUT</span><b id="s-tok-in">—</b></div>
+      <div class="stat"><span class="eyebrow">CACHE</span><b id="s-tok-cache">—</b></div>
+      <div class="stat"><span class="eyebrow">TOKEN OUTPUT</span><b id="s-tok-out">—</b></div>
+    </div>
+
+    <div class="actions-group">
+      <button type="button" class="btn btn-secondary" id="b-signals" aria-pressed="true">SIGNALS</button>
+      <button type="button" class="btn btn-secondary" id="b-thoughts" aria-pressed="true">THOUGHTS</button>
+      <button type="button" class="btn btn-secondary" id="b-secrets" aria-pressed="false">REVEAL</button>
+      <a id="b-dl" href="match.txt" download hidden>
+        <button type="button" class="btn btn-secondary">REPLAY</button>
+      </a>
+      <button type="button" class="btn btn-primary" id="b-new-match">START MATCH</button>
+    </div>
+  </header>
+
+  <!-- Error Banner -->
+  <div id="main-error-banner" class="banner error-banner" style="display:none;">
+    <span id="main-error-text"></span>
+    <button type="button" class="close-btn" onclick="document.getElementById('main-error-banner').style.display='none'" aria-label="Close error">&times;</button>
+  </div>
+
+  <!-- Main Game Board -->
+  <main class="grid">
+    <!-- Left: Poker Table & Action Stepper -->
+    <section class="panel table-panel">
+      <header class="panel-header">
+        <h2>POKER TABLE</h2>
+        <span class="badge" id="s-phase">READY</span>
+      </header>
+      
+      <div class="table" id="table">
+        <div class="callout-overlay" id="callout-overlay"></div>
+        <div class="seat p1" id="seat-0"></div>
+        <div class="seat p2" id="seat-1"></div>
+        <div class="center" id="center"></div>
+        <div class="seat p4" id="seat-3"></div>
+        <div class="seat p3" id="seat-2"></div>
+      </div>
+      
+      <div class="action-caption">
+        <span class="tag" id="q-tag">—</span>
+        <span id="q-text" class="vide">Waiting for a game…</span>
+      </div>
+      
+      <div class="stepper">
+        <button type="button" class="btn btn-secondary btn-icon" id="b-first" title="Start">|&lt;</button>
+        <button type="button" class="btn btn-secondary btn-icon" id="b-turn-prev" title="Previous turn">&lt;&lt;</button>
+        <button type="button" class="btn btn-secondary btn-icon" id="b-prev" title="Previous action">&lt;</button>
+        <button type="button" class="btn btn-primary" id="b-auto" title="Auto play actions">▶ PLAY</button>
+        <button type="button" class="btn btn-secondary btn-icon" id="b-next" title="Next action">&gt;</button>
+        <button type="button" class="btn btn-secondary btn-icon" id="b-turn-next" title="Next turn">&gt;&gt;</button>
+        
+        <input type="range" class="scrub-slider" id="scrub" min="0" max="0" value="0">
+        
+        <button type="button" class="btn btn-secondary" id="b-live" aria-pressed="true" title="Follow live">
+          <span class="live-dot"></span> LIVE
+        </button>
+        <span class="mono eyebrow" id="s-pos">0 / 0</span>
+      </div>
+    </section>
+
+    <!-- Right: Communications & Logs -->
+    <aside class="stack">
+      <section class="panel">
+        <header class="panel-header">
+          <h2>PUBLIC CHAT</h2>
+          <span class="eyebrow">TABLE CONVERSATION</span>
+        </header>
+        <div class="body"><div class="flux" id="chat"><p class="vide">Nothing yet.</p></div></div>
+      </section>
+
+      <section class="panel" id="pan-signals">
+        <header class="panel-header">
+          <h2>SECRET SIGNALS</h2>
+          <span class="eyebrow">PRIVATE TEAM STRATEGY</span>
+        </header>
+        <div class="body"><div class="flux" id="signals-chat"><p class="vide">Nothing yet.</p></div></div>
+      </section>
+
+      <section class="panel" id="pan-thoughts">
+        <header class="panel-header">
+          <h2>PLAYER THOUGHTS</h2>
+          <span class="eyebrow">INNER STRATEGY</span>
+        </header>
+        <div class="body"><div class="flux" id="thoughts-log"><p class="vide">Nothing yet.</p></div></div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-header">
+          <h2>MATCH HIGHLIGHTS</h2>
+          <span class="eyebrow">SQUARES &amp; CALLS</span>
+        </header>
+        <div class="body" id="episodes"><p class="vide">No square formed.</p></div>
+      </section>
+    </aside>
+  </main>
+
+  <!-- Match Configuration Dialog -->
+  <dialog id="dlg" class="modal">
+    <div class="modal-header">
+      <h2>CONFIGURE MATCH</h2>
+      <div style="display:flex; align-items:center; gap:0.6rem;">
+        <button type="button" class="btn btn-primary" id="b-launch">START MATCH</button>
+        <button type="button" class="close-btn" id="b-dlg-close" aria-label="Close dialog">&times;</button>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <label class="field">
+        <span class="label-text">ROUNDS</span>
+        <select id="f-rounds"></select>
+      </label>
+      <label class="field">
+        <span class="label-text">POINTS TO WIN</span>
+        <input type="number" id="f-points" value="2" min="1">
+      </label>
+      <label class="field">
+        <span class="label-text">API CALL DELAY (S)</span>
+        <input type="number" id="f-pause" value="0.5" step="0.5" min="0">
+      </label>
+      <label class="field">
+        <span class="label-text">MAX TURNS</span>
+        <input type="number" id="f-turns" value="8" min="1">
+      </label>
+      <label class="field">
+        <span class="label-text">CARD SEED</span>
+        <input type="number" id="f-seed-cards" value="11">
+      </label>
+      <label class="field">
+        <span class="label-text">ORDER SEED</span>
+        <input type="number" id="f-seed-order" value="22">
+      </label>
+      <button type="button" class="btn btn-secondary" id="b-randomize" style="align-self:flex-end;">
+        RANDOMIZE
+      </button>
+      <input type="hidden" id="f-ranks" value="10">
+      <input type="checkbox" id="f-eval" hidden>
+    </div>
+
+    <div class="table-container" style="margin-top:0.75rem;">
+      <table class="players-table">
+        <thead>
+          <tr>
+            <th>PLAYER</th>
+            <th>TEAM</th>
+            <th>MODEL LLM</th>
+            <th>TEMPERATURE</th>
+          </tr>
+        </thead>
+        <tbody id="f-players"></tbody>
+      </table>
+    </div>
+
+    <p class="err" id="f-err" hidden></p>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
